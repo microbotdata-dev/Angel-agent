@@ -1,5 +1,8 @@
 # 🛡️ Angel Agent
 
+> **Îngerul tău păzitor digital**  
+> *Created by [MicroBot](https://microbot.uk) — Technology with a soul.*
+
 **Your Personal Security Guardian — Open Source**
 
 Angel is an AI-powered personal security agent that protects your digital identity. Not just an antivirus — it knows **what you have** to protect and watches those specific surfaces 24/7.
@@ -16,8 +19,8 @@ Angel is an AI-powered personal security agent that protects your digital identi
 | 🌐 **Port Monitor** | Detects unexpected services listening on your machine | Free |
 | ⚙️ **Process Monitor** | Flags unknown processes with high CPU or network | Free |
 | 📁 **File Integrity** | Watches critical files for unauthorized changes | Free |
+| 📢 **Discord Alerts** | Real-time CRITICAL/HIGH alerts + periodic summaries | Free |
 | 🧠 **Self-Learning** | Gets smarter from your feedback — no coding needed | Free |
-| 📢 **Discord Alerts** | Sends real-time alerts to your Discord server | Free |
 
 ## Quick Start
 

@@ -59,8 +59,14 @@ class AngelAgent:
             print(f"❌ Config not found: {path}")
             print(f"   Copy config/config.example.yaml to {path} and edit it.")
             sys.exit(1)
-        with open(path) as f:
-            return yaml.safe_load(f)
+        try:
+            with open(path) as f:
+                return yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            log.error(f"Invalid YAML in config: {e}")
+            print(f"❌ Invalid YAML in config: {path}")
+            print(f"   Error: {e}")
+            sys.exit(1)
 
     def run_once(self) -> list[dict]:
         """Run one full check cycle. Returns list of findings."""
@@ -112,13 +118,15 @@ class AngelAgent:
         # Apply learning — filter out known false positives
         findings = self.learning.filter_findings(findings)
 
-        # Save state
+        # Save state (limit history to 1000 entries)
         self.state.last_check = datetime.now(timezone.utc).isoformat()
         self.state.findings_history.append({
             "timestamp": self.state.last_check,
             "count": len(findings),
             "severity": self._compute_severity(findings),
         })
+        if len(self.state.findings_history) > 1000:
+            self.state.findings_history = self.state.findings_history[-1000:]
         self.state.save()
 
         log.info(f"✅ Angel check complete — {len(findings)} finding(s)")

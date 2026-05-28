@@ -59,7 +59,7 @@ class LearningEngine:
     def compute_finding_id(self, finding: dict) -> str:
         """Stable ID for a finding type. Same pattern = same ID."""
         raw = f"{finding.get('type')}:{finding.get('key', '')}"
-        return hashlib.md5(raw.encode()).hexdigest()[:12]
+        return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
     def record_feedback(self, finding_id: str, action: str):
         """Record user feedback on a finding."""

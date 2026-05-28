@@ -4,7 +4,6 @@ No API needed. Pure pattern matching.
 """
 
 import os
-import re
 import logging
 from pathlib import Path
 from typing import Optional
@@ -52,9 +51,9 @@ def scan_secrets(config: dict, learning) -> list[dict]:
 
 
 def _scan_directory(directory: Path, patterns: list[str], exclude: set, learning) -> list[dict]:
-    """Recursively scan a directory for secrets."""
+    """Recursively scan a directory for secrets. No symlink following."""
     findings = []
-    for root, dirs, files in os.walk(directory):
+    for root, dirs, files in os.walk(directory, followlinks=False):  # 🔒 CRITICAL: no symlinks
         # Skip excluded directories
         dirs[:] = [d for d in dirs if d not in exclude and not d.startswith(".")]
 
@@ -75,6 +74,9 @@ def _check_file(filepath: Path, patterns: list[str], learning) -> list[dict]:
         # Skip large files
         if filepath.stat().st_size > 1024 * 1024:  # 1MB
             return []
+        # Skip symlinks entirely
+        if filepath.is_symlink():
+            return []
 
         with open(filepath, "r", errors="ignore") as f:
             content = f.read()
@@ -86,7 +88,7 @@ def _check_file(filepath: Path, patterns: list[str], learning) -> list[dict]:
 
             for pattern in patterns:
                 if pattern.upper() in line_stripped.upper():
-                    # Try to extract the value
+                    # Extract the value to verify it's real (but DON'T include in finding)
                     value = _extract_value(line_stripped)
                     if value and len(value) > 4:
                         findings.append({
@@ -95,7 +97,7 @@ def _check_file(filepath: Path, patterns: list[str], learning) -> list[dict]:
                             "severity": "HIGH",
                             "title": f"Secret pattern '{pattern}' in plaintext",
                             "description": f"{filepath.name}:{i}",
-                            "details": f"File: {filepath}\nLine: {i}\nPattern: {pattern}\nValue: {value[:50]}{'...' if len(value) > 50 else ''}",
+                            "details": f"File: {filepath}\nLine: {i}\nPattern: {pattern}\n🔒 Value redacted for security",
                             "action": "Move this secret to a password manager (KeePass/Bitwarden) and remove from file.",
                         })
                         break  # One alert per line
@@ -106,8 +108,7 @@ def _check_file(filepath: Path, patterns: list[str], learning) -> list[dict]:
 
 
 def _extract_value(line: str) -> Optional[str]:
-    """Extract the value part from a key=value or "key": "value" line."""
-    # key=value or key: value
+    """Extract the value part from a key=value or 'key': 'value' line."""
     for sep in ["=", ":", "=>"]:
         if sep in line:
             parts = line.split(sep, 1)
