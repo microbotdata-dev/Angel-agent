@@ -115,6 +115,12 @@ class AngelAgent:
             result = check_integrity(monitors_cfg["file_integrity"], self.state, self.learning)
             findings.extend(result)
 
+        # --- 7. Deep Scan (shell history, logs, env) ---
+        if monitors_cfg.get("deep", {}).get("enabled", False):
+            from .monitors.deep import scan_deep
+            result = scan_deep(monitors_cfg["deep"], self.learning)
+            findings.extend(result)
+
         # Apply learning — filter out known false positives
         findings = self.learning.filter_findings(findings)
 
