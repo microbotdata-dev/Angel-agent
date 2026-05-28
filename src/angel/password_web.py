@@ -86,6 +86,15 @@ HTML_PAGE = r"""
   .found-item .sev { font-size: 0.7rem; padding: 0.15rem 0.4rem; border-radius: 4px; }
   .sev.red { background: #5a1a1a; color: #ff6666; }
   .sev.yellow { background: #5a5a1a; color: #ffff66; }
+  .tickets-card { background: #0d0d18; border: 1px solid #1a1a2a; border-radius: 12px; padding: 1rem; margin-top: 1rem; }
+  .ticket-row { display: flex; align-items: center; gap: 8px; padding: 0.5rem; border-radius: 8px; margin: 0.2rem 0; font-size: 0.85rem; }
+  .ticket-row.green { background: #0a1a0a; }
+  .ticket-row.red { background: #2a0a0a; }
+  .ticket-row.yellow { background: #2a2a0a; }
+  .ticket-dot { font-size: 1rem; width: 24px; }
+  .ticket-id { color: #4a6cf7; font-weight: 700; min-width: 40px; }
+  .ticket-ts { color: #555; font-size: 0.75rem; min-width: 60px; }
+  .ticket-pw { color: #888; font-family: monospace; }
   .note { font-size: 0.8rem; color: #666; text-align: center; margin-top: 1rem; }
   .spinner { display: inline-block; width: 1rem; height: 1rem; border: 2px solid #333; border-top-color: #4a6cf7; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 0.5rem; vertical-align: middle; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -113,6 +122,10 @@ HTML_PAGE = r"""
     🔒 Parola e procesată DOAR în RAM, apoi ștearsă. Nu rămâne în istoric, cache, loguri sau temp.<br>
     Fiecare verificare = un ticket cu număr. Status: 🟢 verde / 🔴 roșu / 🟡 galben.
   </p>
+  <div class="tickets-card">
+    <h4 style="color:#888;font-size:0.9rem;margin-bottom:0.8rem;">📋 Ultimele tickete</h4>
+    <div id="ticketList"><p style="color:#555;font-size:0.85rem;">Nicio verificare inca...</p></div>
+  </div>
 </div>
 <script>
 const form = document.getElementById('checkForm');
@@ -121,6 +134,24 @@ const resultDiv = document.getElementById('result');
 const checkBtn = document.getElementById('checkBtn');
 const btnText = document.getElementById('btnText');
 const btnSpinner = document.getElementById('btnSpinner');
+
+// Load tickets on page load
+loadTickets();
+
+async function loadTickets() {
+  try {
+    const r = await fetch('/tickets');
+    const data = await r.json();
+    const container = document.getElementById('ticketList');
+    if (data.tickets && data.tickets.length > 0) {
+      container.innerHTML = data.tickets.map(t => {
+        const emoji = t.status === 'green' ? '🟢' : t.status === 'red' ? '🔴' : '🟡';
+        const time = new Date(t.created).toLocaleTimeString();
+        return `<div class="ticket-row ${t.status}"><span class="ticket-dot">${emoji}</span><span class="ticket-id">#${t.id}</span><span class="ticket-ts">${time}</span><span class="ticket-pw">${t.password_mask || ''}</span></div>`;
+      }).join('');
+    }
+  } catch(e) { /* silent */ }
+}
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -131,6 +162,16 @@ form.addEventListener('submit', async (e) => {
   btnText.classList.add('hidden');
   btnSpinner.classList.remove('hidden');
   resultDiv.style.display = 'none';
+
+  // Arata ticket "in lucru" imediat
+  const mask = password[0] + '*'.repeat(Math.min(password.length - 2, 8)) + password[password.length - 1];
+  const tix = document.getElementById('ticketList');
+  const tempRow = document.createElement('div');
+  tempRow.className = 'ticket-row yellow';
+  tempRow.id = 'tempTicket';
+  tempRow.innerHTML = '<span class="ticket-dot">🟡</span><span class="ticket-id">#—</span><span class="ticket-ts">acum</span><span class="ticket-pw">' + mask + ' — în lucru...</span>';
+  if (tix.children[0]?.tagName === 'P') tix.innerHTML = '';
+  tix.prepend(tempRow);
 
   try {
     const resp = await fetch('/check', {
@@ -151,7 +192,11 @@ form.addEventListener('submit', async (e) => {
     checkBtn.disabled = false;
     btnText.classList.remove('hidden');
     btnSpinner.classList.add('hidden');
-    passInput.value = ''; // Clear password from field
+    passInput.value = '';
+    // Sterge randul temporar, loadTickets() il inlocuieste cu cel real
+    const tmp = document.getElementById('tempTicket');
+    if (tmp) tmp.remove();
+    loadTickets();
   }
 });
 
@@ -165,6 +210,7 @@ function showSafe(data) {
       Parola mascata: <strong>${data.password_mask}</strong><br>
       Ticket inchis automat.
     </p>`;
+  loadTickets();
 }
 
 function showFound(data) {
@@ -187,6 +233,7 @@ function showFound(data) {
     <p style="color:#666;font-size:0.85rem;margin-top:1rem;">
       Parola mascata: <strong>${data.password_mask}</strong>
     </p>`;
+  loadTickets();
 }
 
 async function repair(ticketId) {
@@ -237,6 +284,9 @@ class AngelWebHandler(BaseHTTPRequestHandler):
             self._serve_page()
         elif path == "/health":
             self._json_response({"status": "ok", "service": "angel-password-check"})
+        elif path == "/tickets":
+            tickets = tk.list_recent(10)
+            self._json_response({"tickets": tickets})
         else:
             self.send_response(404)
             self.end_headers()

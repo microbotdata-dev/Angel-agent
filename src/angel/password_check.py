@@ -21,8 +21,8 @@ EXCLUDE_DIRS = [
     "vendor", "dist", "build", ".next", ".npm", ".yarn", "target",
     ".terraform", ".serverless", "backups",
 ]
-SEARCH_PATHS = ["~/cosmos/projects", "~/.ssh", "~/cosmos/scripts"]
-EXTRA_PATHS_TIMEOUT = {"~/.hermes": 8}  # Shorter timeout for deeper dirs
+SEARCH_PATHS = ["~/cosmos/projects/angel-agent"]
+EXTRA_PATHS_TIMEOUT = {"~/cosmos/projects": 10, "~/.hermes": 6, "~/.ssh": 4}
 MAX_RESULTS = 50  # Stop after finding this many locations
 
 
