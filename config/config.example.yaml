@@ -1,0 +1,100 @@
+# Angel Agent — Example Configuration
+# Copy to config.yaml and fill your details
+# NEVER commit config.yaml to git!
+
+angel:
+  name: "Angel"
+  check_interval: 1800  # seconds (30 min)
+  data_dir: "~/.angel"
+  log_level: "info"
+
+notifications:
+  discord:
+    webhook_url: ""  # Your Discord webhook URL
+    alert_channel: "#angel-alerts"
+    report_channel: "#angel-report"
+  sms:  # optional
+    enabled: false
+    provider: "twilio"
+    from: ""
+    to: ""
+
+# Who to protect
+identities:
+  emails:
+    - "your@email.com"
+  usernames:
+    - "your_username"
+  domains:
+    - "yourdomain.com"
+
+# What to monitor
+monitors:
+  secrets:
+    enabled: true
+    paths:
+      - "~/projects"
+      - "~/.config"
+    exclude_patterns:
+      - "node_modules"
+      - ".git"
+      - "venv"
+    # Patterns to look for in plaintext
+    patterns:
+      - "API_KEY"
+      - "SECRET"
+      - "PASSWORD"
+      - "TOKEN"
+      - "PRIVATE_KEY"
+
+  git_secrets:
+    enabled: true
+    scan_on_commit: true
+    repos:
+      - "~/projects"
+
+  credential_leaks:
+    enabled: true
+    # Uses free APIs only:
+    # - HIBP Pwned Passwords (k-anonymity, free, no key)
+    # - Firefox Monitor (free)
+    # - IntelX (free tier, 50 queries/day)
+    check_passwords: true
+    check_emails: true
+    providers:
+      hibp_range: true    # Free, no key needed
+      firefox_monitor: true  # Free
+      intelx: false       # Needs API key
+
+  ports:
+    enabled: true
+    known_ports:
+      - 22
+      - 80
+      - 443
+      - 5432
+      - 6333
+      - 6379
+      - 8080
+      - 8091
+      - 8123
+      - 11434
+
+  processes:
+    enabled: true
+    known_processes:
+      - "kernel_task"
+      - "launchd"
+      - "Finder"
+      - "Terminal"
+      - "Python"
+      - "node"
+      - "docker"
+      - "ollama"
+
+  file_integrity:
+    enabled: true
+    watch_paths:
+      - "~/.ssh/authorized_keys"
+      - "~/.env"
+      - "/etc/hosts"

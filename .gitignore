@@ -1,0 +1,46 @@
+# Angel Agent — .gitignore
+
+# Config personal (nu ajunge in repo)
+config.yaml
+config.local.yaml
+config.local.yml
+
+# Environment files
+.env
+.env.local
+*.env
+
+# Cache and data
+__pycache__/
+*.pyc
+*.pyo
+*.db
+*.sqlite
+*.sqlite3
+learned_rules.json
+angel_state.json
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets (just in case)
+*.key
+*.pem
+*.p12
+*.kdbx
+secrets/
+credentials/
+
+# Virtual env
+venv/
+.venv/
+env/
