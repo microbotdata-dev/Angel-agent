@@ -163,8 +163,8 @@ form.addEventListener('submit', async (e) => {
   btnSpinner.classList.remove('hidden');
   resultDiv.style.display = 'none';
 
-  // Arata ticket "in lucru" imediat
-  const mask = password[0] + '*'.repeat(Math.min(password.length - 2, 8)) + password[password.length - 1];
+  // Arata ticket "in lucru" imediat — 10 stelute mereu
+  const mask = password[0] + '*'.repeat(10) + password[password.length - 1];
   const tix = document.getElementById('ticketList');
   const tempRow = document.createElement('div');
   tempRow.className = 'ticket-row yellow';
@@ -179,7 +179,7 @@ form.addEventListener('submit', async (e) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password })
     });
-    const data = await resp.json();
+    var data = await resp.json();
 
     if (data.found) {
       showFound(data);
@@ -193,9 +193,18 @@ form.addEventListener('submit', async (e) => {
     btnText.classList.remove('hidden');
     btnSpinner.classList.add('hidden');
     passInput.value = '';
-    // Sterge randul temporar, loadTickets() il inlocuieste cu cel real
+    // Actualizeaza ticketul temporar cu rezultatul real — NU il sterge!
     const tmp = document.getElementById('tempTicket');
-    if (tmp) tmp.remove();
+    if (tmp && data) {
+      const emoji = data.found ? '🔴' : '🟢';
+      const cls = data.found ? 'red' : 'green';
+      tmp.className = 'ticket-row ' + cls;
+      tmp.innerHTML = '<span class="ticket-dot">' + emoji + '</span><span class="ticket-id">#' + data.ticket_id + '</span><span class="ticket-ts">' + new Date().toLocaleTimeString() + '</span><span class="ticket-pw">' + data.password_mask + '</span>';
+    } else if (tmp) {
+      // Eroare — pastram ticketul vizibil cu status 🔴
+      tmp.className = 'ticket-row red';
+      tmp.innerHTML = '<span class="ticket-dot">🔴</span><span class="ticket-id">#—</span><span class="ticket-ts">' + new Date().toLocaleTimeString() + '</span><span class="ticket-pw">eroare conexiune</span>';
+    }
     loadTickets();
   }
 });
@@ -210,7 +219,6 @@ function showSafe(data) {
       Parola mascata: <strong>${data.password_mask}</strong><br>
       Ticket inchis automat.
     </p>`;
-  loadTickets();
 }
 
 function showFound(data) {
@@ -233,7 +241,6 @@ function showFound(data) {
     <p style="color:#666;font-size:0.85rem;margin-top:1rem;">
       Parola mascata: <strong>${data.password_mask}</strong>
     </p>`;
-  loadTickets();
 }
 
 async function repair(ticketId) {
