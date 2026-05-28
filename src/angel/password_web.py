@@ -12,6 +12,8 @@ import hashlib
 from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+import threading
 
 from .password_check import check_password
 from . import ticket as tk
@@ -163,13 +165,13 @@ form.addEventListener('submit', async (e) => {
   btnSpinner.classList.remove('hidden');
   resultDiv.style.display = 'none';
 
-  // Arata ticket "in lucru" imediat — 10 stelute mereu
+  // Ticket temporar galben — apare IMEDIAT
   const mask = password[0] + '*'.repeat(10) + password[password.length - 1];
   const tix = document.getElementById('ticketList');
   const tempRow = document.createElement('div');
   tempRow.className = 'ticket-row yellow';
   tempRow.id = 'tempTicket';
-  tempRow.innerHTML = '<span class="ticket-dot">🟡</span><span class="ticket-id">#—</span><span class="ticket-ts">acum</span><span class="ticket-pw">' + mask + ' — în lucru...</span>';
+  tempRow.innerHTML = '<span class="ticket-dot">🟡</span><span class="ticket-id">#—</span><span class="ticket-ts">acum</span><span class="ticket-pw">' + mask + ' — scanare in curs...</span>';
   if (tix.children[0]?.tagName === 'P') tix.innerHTML = '';
   tix.prepend(tempRow);
 
@@ -179,13 +181,16 @@ form.addEventListener('submit', async (e) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password })
     });
-    var data = await resp.json();
+    const data = await resp.json();
 
-    if (data.found) {
-      showFound(data);
-    } else {
-      showSafe(data);
+    // Actualizam ticketul temporar cu numarul real — ramane 🟡
+    const tmp = document.getElementById('tempTicket');
+    if (tmp) {
+      tmp.innerHTML = '<span class="ticket-dot">🟡</span><span class="ticket-id">#' + data.ticket_id + '</span><span class="ticket-ts">' + new Date().toLocaleTimeString() + '</span><span class="ticket-pw">' + data.password_mask + ' — scanare in curs...</span>';
     }
+
+    // Incepem polling — intrebam statusul la fiecare 3s
+    startPolling(data.ticket_id, data.password_mask);
   } catch (err) {
     showError('Eroare conexiune: ' + err.message);
   } finally {
@@ -193,21 +198,37 @@ form.addEventListener('submit', async (e) => {
     btnText.classList.remove('hidden');
     btnSpinner.classList.add('hidden');
     passInput.value = '';
-    // Actualizeaza ticketul temporar cu rezultatul real — NU il sterge!
-    const tmp = document.getElementById('tempTicket');
-    if (tmp && data) {
-      const emoji = data.found ? '🔴' : '🟢';
-      const cls = data.found ? 'red' : 'green';
-      tmp.className = 'ticket-row ' + cls;
-      tmp.innerHTML = '<span class="ticket-dot">' + emoji + '</span><span class="ticket-id">#' + data.ticket_id + '</span><span class="ticket-ts">' + new Date().toLocaleTimeString() + '</span><span class="ticket-pw">' + data.password_mask + '</span>';
-    } else if (tmp) {
-      // Eroare — pastram ticketul vizibil cu status 🔴
-      tmp.className = 'ticket-row red';
-      tmp.innerHTML = '<span class="ticket-dot">🔴</span><span class="ticket-id">#—</span><span class="ticket-ts">' + new Date().toLocaleTimeString() + '</span><span class="ticket-pw">eroare conexiune</span>';
-    }
-    loadTickets();
   }
 });
+
+let pollInterval = null;
+
+function startPolling(ticketId, mask) {
+  if (pollInterval) clearInterval(pollInterval);
+  pollInterval = setInterval(async () => {
+    try {
+      const r = await fetch('/tickets');
+      const data = await r.json();
+      if (!data.tickets) return;
+      const ticket = data.tickets.find(t => t.id === ticketId);
+      if (!ticket) return;
+
+      const tmp = document.getElementById('tempTicket');
+      if (!tmp) { clearInterval(pollInterval); pollInterval = null; return; }
+
+      // Daca statusul s-a schimbat din galben, actualizam
+      if (ticket.status !== 'yellow') {
+        const emoji = ticket.status === 'red' ? '🔴' : '🟢';
+        tmp.className = 'ticket-row ' + ticket.status;
+        const time = new Date(ticket.updated || Date.now()).toLocaleTimeString();
+        tmp.innerHTML = '<span class="ticket-dot">' + emoji + '</span><span class="ticket-id">#' + ticketId + '</span><span class="ticket-ts">' + time + '</span><span class="ticket-pw">' + mask + '</span>';
+        // Oprim polling-ul
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    } catch(e) { /* silent — retry la urmatorul interval */ }
+  }, 3000);
+}
 
 function showSafe(data) {
   resultDiv.className = 'result green';
@@ -323,45 +344,43 @@ class AngelWebHandler(BaseHTTPRequestHandler):
         password = body.get("password", "")
         password_mask = tk.mask_password(password)
 
-        # Create ticket
+        # Create ticket (immediately, yellow/scanning)
         ticket = tk.create(password_mask)
         ticket_id = ticket["id"]
+        tk.update(ticket_id, "yellow", "Scan in progres...")
 
-        # Check password
-        search_paths = ["~/cosmos/projects", "~/.hermes", "~/.ssh"]
-        result = check_password(password, search_paths)
+        # Start background scan — raspunsul vine instant, scanarea continua separat
+        t = threading.Thread(target=self._background_scan, args=(password, password_mask, ticket_id), daemon=True)
+        t.start()
 
-        # Update ticket
-        if result["found"]:
-            tk.update(ticket_id, "red", f"Gasita in {result['total']} locuri", result["locations"])
-        else:
-            tk.update(ticket_id, "green", "Negasita")
-
-        # Recommend
-        rec = tk.recommend([f.get("type") for f in result.get("locations", [])])
-
-        # Produce safe response (no password exposure)
-        response = {
+        # Return immediately — nu asteptam scanarea
+        self._json_response({
             "ticket_id": ticket_id,
-            "found": result["found"],
-            "total": result["total"],
             "password_mask": password_mask,
-            "findings": [
-                {
-                    "type": f.get("type"),
-                    "location": f.get("location")[:120],
-                    "severity": f.get("severity", "LOW"),
-                }
-                for f in result.get("locations", [])
-            ],
-            "recommendation": rec,
-        }
+            "status": "scanning",
+            "message": "Scan started. Ticket will update when done."
+        })
 
-        self._json_response(response)
-
-        # Cleanup — overwrite password in memory
+        # Cleanup password reference
         password = "X" * len(password)
         del password
+
+    def _background_scan(self, password, password_mask, ticket_id):
+        """Run password scan in background thread, update ticket when done."""
+        try:
+            search_paths = ["~/cosmos/projects/angel-agent", "~/.hermes", "~/.ssh"]
+            result = check_password(password, search_paths)
+            if result["found"]:
+                tk.update(ticket_id, "red", f"Gasita in {result['total']} locuri", result["locations"])
+            else:
+                tk.update(ticket_id, "green", "Negasita")
+        except Exception as e:
+            log.error(f"Background scan failed: {e}")
+            tk.update(ticket_id, "yellow", f"Scan esuat: {str(e)[:80]}")
+        finally:
+            # Overwrite password in memory
+            password = "X" * len(password)
+            del password
 
     def _handle_repair(self):
         body = self._read_body()

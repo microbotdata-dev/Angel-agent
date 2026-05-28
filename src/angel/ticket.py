@@ -37,10 +37,10 @@ def _ticket_path(ticket_id) -> Path:
 
 
 def mask_password(password: str) -> str:
-    """Show only first and last char: 'p*****a'"""
+    """Show only first and last char with 10 asterisks: 'p**********a'"""
     if len(password) <= 2:
         return "***"
-    return password[0] + "*" * (len(password) - 2) + password[-1]
+    return password[0] + "*" * 10 + password[-1]
 
 
 def recommend(finding_types: list[str]) -> dict:

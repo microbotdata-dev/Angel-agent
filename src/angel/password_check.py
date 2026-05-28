@@ -40,7 +40,7 @@ def check_password(password: str, paths: list[str] = None) -> dict:
 
     # ── 1. Search in files ──────────────────────────────────────
     if len(results) < MAX_RESULTS:
-        results.extend(_search_files(password, paths))
+        results.extend(_search_files(password, paths, extra_paths=EXTRA_PATHS_TIMEOUT))
 
     # ── 2. Shell history ────────────────────────────────────────
     if len(results) < MAX_RESULTS:
@@ -66,14 +66,17 @@ def check_password(password: str, paths: list[str] = None) -> dict:
     return result
 
 
-def _search_files(password: str, paths: list[str]) -> list[dict]:
+def _search_files(password: str, paths: list[str], extra_paths: dict = None) -> list[dict]:
     """Search for password in files, excluding noisy dirs."""
     results = []
+    visited = set()
 
     def _grep(path: Path, tout: int = 15):
         nonlocal results
-        if not path.exists() or len(results) >= MAX_RESULTS:
+        key = str(path.resolve())
+        if key in visited or not path.exists() or len(results) >= MAX_RESULTS:
             return
+        visited.add(key)
         try:
             cmd = ["grep", "-rl", "--ignore-case"]
             for d in EXCLUDE_DIRS:
@@ -93,8 +96,10 @@ def _search_files(password: str, paths: list[str]) -> list[dict]:
     for path_str in paths:
         _grep(Path(path_str).expanduser(), 15)
 
-    for path_str, tout in EXTRA_PATHS_TIMEOUT.items():
-        _grep(Path(path_str).expanduser(), tout)
+    # Scan extra paths with their specific timeouts (avoiding dupes via visited set)
+    if extra_paths:
+        for path_str, tout in extra_paths.items():
+            _grep(Path(path_str).expanduser(), tout)
 
     return results
 
