@@ -130,6 +130,9 @@ HTML_PAGE = r"""
   </div>
 </div>
 <script>
+// Base URL pentru rute relative — functioneaza si local si prin proxy (/angel/)
+const BASE = window.location.pathname.replace(/\/[^/]*$/, '/');
+
 const form = document.getElementById('checkForm');
 const passInput = document.getElementById('password');
 const resultDiv = document.getElementById('result');
@@ -142,7 +145,7 @@ loadTickets();
 
 async function loadTickets() {
   try {
-    const r = await fetch('/tickets');
+    const r = await fetch(BASE + 'tickets');
     const data = await r.json();
     const container = document.getElementById('ticketList');
     if (data.tickets && data.tickets.length > 0) {
@@ -176,7 +179,7 @@ form.addEventListener('submit', async (e) => {
   tix.prepend(tempRow);
 
   try {
-    const resp = await fetch('/check', {
+    const resp = await fetch(BASE + 'check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password })
@@ -207,7 +210,7 @@ function startPolling(ticketId, mask) {
   if (pollInterval) clearInterval(pollInterval);
   pollInterval = setInterval(async () => {
     try {
-      const r = await fetch('/tickets');
+      const r = await fetch(BASE + 'tickets');
       const data = await r.json();
       if (!data.tickets) return;
       const ticket = data.tickets.find(t => t.id === ticketId);
