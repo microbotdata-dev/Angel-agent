@@ -26,6 +26,9 @@ HTML_PAGE = r"""
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="pragma" content="no-cache">
+<meta http-equiv="expires" content="-1">
 <title>Angel — Password Check</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
