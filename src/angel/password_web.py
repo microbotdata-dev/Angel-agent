@@ -122,7 +122,8 @@ HTML_PAGE = r"""
   </div>
   <p class="note">
     🔒 Parola e procesată DOAR în RAM, apoi ștearsă. Nu rămâne în istoric, cache, loguri sau temp.<br>
-    Fiecare verificare = un ticket cu număr. Status: 🟢 verde / 🔴 roșu / 🟡 galben.
+    Fiecare verificare = un ticket cu număr. Status: 🟢 verde / 🔴 roșu / 🟡 galben.<br>
+    <span style="color:#555;font-size:0.75rem;">🛡️ Angel — Port 7890 (localhost) / Accesibil via ado.microbot.uk/angel/</span>
   </p>
   <div class="tickets-card">
     <h4 style="color:#888;font-size:0.9rem;margin-bottom:0.8rem;">📋 Ultimele tickete</h4>
