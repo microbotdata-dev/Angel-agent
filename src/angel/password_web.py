@@ -229,52 +229,62 @@ function startPolling(ticketId, mask) {
         // Oprim polling-ul
         clearInterval(pollInterval);
         pollInterval = null;
+        // Arata caseta cu detalii + buton 🔧
+        if (ticket.status === 'red') {
+          showFound(ticket);
+        } else {
+          showSafe(ticket);
+        }
       }
     } catch(e) { /* silent — retry la urmatorul interval */ }
   }, 3000);
 }
 
-function showSafe(data) {
+function showSafe(ticket) {
+  resultDiv.style.display = '';
   resultDiv.className = 'result green';
   resultDiv.innerHTML = `
-    <div class="ticket-badge green">📋 Ticket #${data.ticket_id} — 🟢 VERDE</div>
+    <div class="ticket-badge green">📋 Ticket #${ticket.id} — 🟢 VERDE</div>
     <h3>✅ Parola nu apare niciun</h3>
-    <div class="rec green">${data.recommendation.message}</div>
+    <div class="rec green">${ticket.recommendation?.message || '✅ Totul e in siguranta.'}</div>
     <p style="color:#aaa;font-size:0.85rem;margin-top:1rem;">
-      Parola mascata: <strong>${data.password_mask}</strong><br>
+      Parola mascata: <strong>${ticket.password_mask}</strong><br>
       Ticket inchis automat.
     </p>`;
 }
 
-function showFound(data) {
-  const items = data.findings.map(f =>
+function showFound(ticket) {
+  resultDiv.style.display = '';
+  const items = (ticket.findings || []).map(f =>
     `<div class="found-item">
-      <span class="icon">${f.severity === 'CRITICAL' ? '🔴' : '🟠'}</span>
-      <span class="loc">${f.location}</span>
-      <span class="sev ${f.severity.toLowerCase()}">${f.severity}</span>
+      <span class="icon">${f.severity === 'CRITICAL' ? '🔴' : f.severity === 'HIGH' ? '🟠' : '🟡'}</span>
+      <span class="loc">${(f.location || '').substring(0, 140)}</span>
+      <span class="sev ${(f.severity || 'LOW').toLowerCase()}">${f.severity || 'LOW'}</span>
     </div>`
   ).join('');
 
-  const sev = data.recommendation.severity === 'red' ? 'red' : 'yellow';
-  resultDiv.className = `result ${sev}`;
+  const sev = ticket.recommendation?.severity === 'red' ? 'red' : 'yellow';
+  const count = ticket.findings ? ticket.findings.length : ticket.total || 0;
+  resultDiv.className = 'result ' + sev;
   resultDiv.innerHTML = `
-    <div class="ticket-badge ${sev}">📋 Ticket #${data.ticket_id} — ${sev === 'red' ? '🔴 ROSU' : '🟡 GALBEN'}</div>
-    <h3>${sev === 'red' ? '🔴' : '🟡'} Găsită în ${data.total} locuri</h3>
+    <div class="ticket-badge ${sev}">📋 Ticket #${ticket.id} — ${sev === 'red' ? '🔴 ROSU' : '🟡 GALBEN'}</div>
+    <h3>${sev === 'red' ? '🔴' : '🟡'} Găsită în ${count} locuri</h3>
     ${items}
-    <div class="rec ${sev}">${data.recommendation.message}</div>
-    <button class="btn danger" onclick="repair(${data.ticket_id})">🔧 Repară — șterge parola</button>
+    <div class="rec ${sev}">${ticket.recommendation?.message || (sev === 'red' ? '🔴 Parola expusa!' : '🟡 Atentie!')}</div>
+    <button class="btn danger" onclick="repair(${ticket.id}, this)">🔧 Repară — șterge parola</button>
     <p style="color:#666;font-size:0.85rem;margin-top:1rem;">
-      Parola mascata: <strong>${data.password_mask}</strong>
+      Parola mascata: <strong>${ticket.password_mask}</strong>
     </p>`;
 }
 
-async function repair(ticketId) {
-  const repairBtn = event.target;
-  repairBtn.disabled = true;
-  repairBtn.textContent = '⏳ Se repară...';
+async function repair(ticketId, btn) {
+  if (!btn) btn = event?.target;
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Se repară...';
 
   try {
-    const resp = await fetch('/repair', {
+    const resp = await fetch(BASE + 'repair', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticket_id: ticketId })
